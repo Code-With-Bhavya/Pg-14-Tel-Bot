@@ -85,6 +85,7 @@ bot.on('message', async (msg) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log('Bot with AI is running...');
+app.post(`/bot${token}`, (req, res) => {
+    bot.processUpdate(req.body);
+    res.sendStatus(200);
 });
