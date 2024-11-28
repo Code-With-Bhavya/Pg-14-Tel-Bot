@@ -48,4 +48,6 @@ bot.on('message', async (msg) => {
     }
 });
 
+
+
 console.log('Bot with AI is running...');
