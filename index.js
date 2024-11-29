@@ -63,4 +63,4 @@ const setWebhook = async () => {
         console.error('Error setting webhook:', error);
     }
 };
-setWebhook(); // Call the function to set the webhook
+// setWebhook(); // Call the function to set the webhook
