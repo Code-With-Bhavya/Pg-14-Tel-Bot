@@ -7,6 +7,7 @@ const bot = new TelegramBot(token, { polling: false });
 const key = process.env.GEMINI_API_KEY; // Add your Gemini API key in .env
 const genAI = new GoogleGenerativeAI(key);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+console.log('Gemini API Key:', process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
