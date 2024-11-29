@@ -1,91 +1,66 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
-import express from 'express'; // Add this if you're using Express
-
-const app = express(); // Initialize the Express app
-const PORT = process.env.PORT || 3000;
+import express from 'express';
 
 dotenv.config();
 
-const token = process.env.TELEGRAM_TOKEN;
-const key = process.env.GEMINI_API_KEY;
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware to parse incoming JSON updates
+app.use(express.json());
+
+// Telegram bot setup
+const token = process.env.TELEGRAM_TOKEN; // Add your bot token in .env
+const bot = new TelegramBot(token, { polling: false });
+
+// Google Generative AI setup
+const key = process.env.GEMINI_API_KEY; // Add your API key in .env
 const genAI = new GoogleGenerativeAI(key);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-const bot = new TelegramBot(token, { polling: true });
+// Telegram message handler
+app.post('/api/webhook', async (req, res) => {
+    const update = req.body;
 
-const sendMessageInChunks = async (bot, chatId, message, chunkSize = 4095) => {
-    for (let i = 0; i < message.length; i += chunkSize) {
-        const chunk = message.slice(i, i + chunkSize);
-        await bot.sendMessage(chatId, chunk);
+    if (!update.message) {
+        return res.sendStatus(200); // Acknowledge non-message updates
     }
-};
 
-bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const userMessage = msg.text;
-
-    let tempMessage;
+    const chatId = update.message.chat.id;
+    const userMessage = update.message.text;
 
     try {
-        // Step 1: Send a temporary "..." message
-        tempMessage = await bot.sendMessage(chatId, '...');
-
-        // Step 2: Animate the "..." message
-        const dots = ['.', '..', '...'];
-        let animationIndex = 0;
-        const animationInterval = setInterval(async () => {
-            animationIndex = (animationIndex + 1) % dots.length;
-            try {
-                await bot.editMessageText(dots[animationIndex], {
-                    chat_id: chatId,
-                    message_id: tempMessage.message_id,
-                });
-            } catch (e) {
-                console.error('Animation error:', e);
-            }
-        }, 1000);
-
-        // Step 3: Generate the response
+        // Generate the response from Gemini
         const result = await model.generateContent(userMessage);
-        let reply = result.response.text();
+        const reply = result.response.text().trim();
 
-        // Clean and format the response
-        reply = reply.trim().replace(/\n/g, '\n');
-
-        // Stop the animation
-        clearInterval(animationInterval);
-
-        // Step 4: Update the message with the result and send the final response
-        await bot.editMessageText('Processing complete!', {
-            chat_id: chatId,
-            message_id: tempMessage.message_id,
-        });
-        await bot.deleteMessage(chatId, tempMessage.message_id);
-
-        await sendMessageInChunks(bot, chatId, reply);
-
+        // Send the generated response to the user
+        await bot.sendMessage(chatId, reply);
     } catch (error) {
-        // Handle errors and update the user
         console.error('Error generating text:', error);
         const errorMessage = error.response?.data?.error?.message || 'Sorry, something went wrong!';
-        if (tempMessage) {
-            try {
-                await bot.editMessageText(errorMessage, {
-                    chat_id: chatId,
-                    message_id: tempMessage.message_id,
-                });
-            } catch (e) {
-                console.error('Error editing message:', e);
-            }
-        } else {
-            await bot.sendMessage(chatId, errorMessage);
-        }
+        await bot.sendMessage(chatId, errorMessage);
     }
+
+    res.sendStatus(200); // Acknowledge Telegram's request
 });
 
-app.post(`/bot${token}`, (req, res) => {
-    bot.processUpdate(req.body);
-    res.sendStatus(200);
+// Start the Express server
+app.listen(PORT, () => {
+    console.log(`Bot is running on port ${PORT}`);
 });
+
+// Set the webhook (run this code only once or when you redeploy)
+const webhookUrl = `https://pg-14-tel-bot.vercel.app/api/webhook`; // Replace with your Vercel webhook URL
+const setWebhook = async () => {
+    try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
+        const data = await res.json();
+        console.log('Webhook set:', data);
+    } catch (error) {
+        console.error('Error setting webhook:', error);
+    }
+};
+setWebhook(); // Call the function to set the webhook
