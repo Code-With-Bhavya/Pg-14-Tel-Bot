@@ -1,3 +1,41 @@
-*node modules
-env
-package-lock
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+
+# Logs
+logs/
+*.log
+debug.log
+
+# Environment variables
+.env
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+
+# Build files
+dist/
+build/
+out/
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.pid
+*.seed
+*.pid.lock
+
+# Other
+*.zip
+*.tar
+*.gz
