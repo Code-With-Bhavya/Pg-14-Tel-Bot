@@ -57,7 +57,7 @@ export default async function handler(req, res) {
 
 
                 const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
-                await bot.sendPhoto(chatId, imageBuffer, { caption: `Here is your image for: "${imageDescription}"` });
+                await bot.sendPhoto(chatId, imageBuffer, { caption: `Here is your image for: "${imageDescription}"`, filename: 'generated-image.png' });
 
             }
             else {
