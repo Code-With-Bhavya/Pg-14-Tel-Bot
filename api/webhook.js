@@ -5,7 +5,7 @@ import fs from 'fs';
 
 // Telegram and Gemini setup
 const token = process.env.TELEGRAM_TOKEN; // Add your bot token in .env
-const bot = new TelegramBot(token, { polling: true });
+const bot = new TelegramBot(token, { polling: false });
 
 const key = process.env.GEMINI_API_KEY; // Add your Gemini API key in .env
 const genAI = new GoogleGenerativeAI(key);
