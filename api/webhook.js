@@ -60,9 +60,9 @@ export default async function handler(req, res) {
 
 
                 const buffer = Buffer.from(await imageBlob.arrayBuffer());
-                fs.writeFileSync(filePath, buffer);
+                await fs.writeFileSync(filePath, buffer);
                 await bot.sendPhoto(chatId, filePath, { caption: `Here is your image for: "${imageDescription}"` });
-                fs.unlinkSync(filePath);
+                await fs.unlinkSync(filePath);
             }
             else {
                 //default text 
