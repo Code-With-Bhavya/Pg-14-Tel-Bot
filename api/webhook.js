@@ -1,7 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import fetch from 'node-fetch';
-import fs from 'fs';
+import fs from 'fs/promises';
 
 // Telegram and Gemini setup
 const token = process.env.TELEGRAM_TOKEN; // Add your bot token in .env
@@ -30,41 +30,56 @@ async function generateImage(description) {
 }
 
 // Handle incoming messages
-export default async function(msg){
-    const chatId = msg.chat.id;
-    const userMessage = msg.text?.trim();
+export default async function handler(req, res) {
 
-    try {
-        if (userMessage === '/image') {
-            // Set a temporary state to indicate the bot expects an image description next
-            await bot.sendMessage(chatId, 'Please send the description of the image you want to generate.');
-            bot.once('message', async (imageMsg) => {
-                const description = imageMsg.text;
-                try {
-                    await bot.sendMessage(chatId, 'Generating your image, please wait...');
-                    const imageBlob = await generateImage(description);
+    if (req.method === 'POST') {
+        const update = req.body;
 
-                    // Save and send the image
-                    const filePath = `generated-image-${Date.now()}.png`;
-                    const buffer = Buffer.from(await imageBlob.arrayBuffer());
-                    fs.writeFileSync(filePath, buffer);
-
-                    await bot.sendPhoto(chatId, filePath, { caption: `Here is your image for: "${description}"` });
-                    fs.unlinkSync(filePath); // Clean up
-                } catch (imageError) {
-                    console.error('Error generating image:', imageError);
-                    await bot.sendMessage(chatId, 'Failed to generate the image. Please try again.');
-                }
-            });
-        } else {
-            // Default behavior: Text generation
-            const result = await model.generateContent(userMessage);
-            const reply = result.response.text().trim();
-            await bot.sendMessage(chatId, reply);
+        if (!update.message) {
+            return res.status(200).send(); // Acknowledge non-message updates
         }
-    } catch (error) {
-        console.error('Error handling message:', error);
-        const errorMessage = error.response?.data?.error?.message || 'Sorry, something went wrong!';
-        await bot.sendMessage(chatId, errorMessage);
+
+        const chatId = update.message.chat.id;
+        const userMessage = update.message.text;
+
+        try {
+
+            if (userMessage.startsWith('/image')) {
+
+                const imageDescription = userMessage.replace('/image', '').trim();
+
+
+                if (!imageDescription) {
+                    await bot.sendMessage(chatId, 'Please provide a description after the /image command.');
+                    return res.status(200).send();
+                }
+
+                const imageBlob = await generateImage(imageDescription)
+
+                const filePath = `generated-image-${Date.now()}.png`;
+
+
+                const buffer = Buffer.from(await imageBlob.arrayBuffer());
+                fs.writeFileSync(filePath, buffer);
+                await bot.sendPhoto(chatId, filePath, { caption: `Here is your image for: "${imageDescription}"` });
+                fs.unlinkSync(filePath);
+            }
+            else {
+                //default text 
+                const result = await model.generateContent(userMessage);
+                const reply = result.response.text().trim();
+
+                // Send the generated response to the user
+                await bot.sendMessage(chatId, reply);
+            }
+        } catch (error) {
+            console.error('Error generating text:', error);
+            const errorMessage = error.response?.data?.error?.message || 'Sorry, something went wrong!';
+            await bot.sendMessage(chatId, errorMessage);
+        }
+
+        res.status(200).send(); // Acknowledge Telegram's request
+    } else {
+        res.status(405).send('Method Not Allowed'); // Handle non-POST requests
     }
 }
