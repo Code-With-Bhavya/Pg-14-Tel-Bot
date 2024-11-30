@@ -30,7 +30,7 @@ async function generateImage(description) {
 }
 
 // Handle incoming messages
-bot.on('message', async (msg) => {
+export default async function(){
     const chatId = msg.chat.id;
     const userMessage = msg.text?.trim();
 
@@ -67,4 +67,4 @@ bot.on('message', async (msg) => {
         const errorMessage = error.response?.data?.error?.message || 'Sorry, something went wrong!';
         await bot.sendMessage(chatId, errorMessage);
     }
-});
+}
