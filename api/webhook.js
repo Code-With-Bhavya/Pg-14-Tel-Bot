@@ -19,36 +19,39 @@ function sleep(ms) {
 
 
 
-async function generateImage(description, chatId, bot) {
-    const maxRetries = 3; // Limit the number of retries
-    let attempts = 0;
-    while (attempts < maxRetries) {
-        const response = await fetch("https://api-inference.huggingface.co/models/ZB-Tech/Text-to-Image", {
-            headers: {
-                Authorization: `Bearer ${hfToken}`,
-                "Content-Type": "application/json",
-            },
-            method: "POST",
-            body: JSON.stringify({ inputs: description }),
-        });
+async function generateImage(description) {
+    try {
+        const maxRetries = 3; // Limit the number of retries
+        let attempts = 0;
+        while (attempts < maxRetries) {
 
-        if (response.ok) {
-            return await response.blob();  // If successful, return the image blob
-        }
+            const response = await fetch("https://api-inference.huggingface.co/models/ZB-Tech/Text-to-Image", {
+                headers: {
+                    Authorization: `Bearer ${hfToken}`,
+                    "Content-Type": "application/json",
+                },
+                method: "POST",
+                body: JSON.stringify({ inputs: description }),
+            });
 
-        // Check if the error is related to too many requests (status code 429)
-        if (response.status === 429) {
-            console.log('Too many requests. Retrying...');
-            await bot.sendMessage(chatId, 'Too Many Request. Try again')
-            attempts++;
-            await sleep(5000); // Wait for 5 seconds before retrying
-        } else {
-            throw new Error(`Failed to generate image: ${response.statusText}`);
+            if (response.ok) {
+                return {success: true , imageBlob: await response.blob()};  // If successful, return the image blob
+            }
+
+            // Check if the error is related to too many requests (status code 429)
+            if (response.status === 429) {
+                console.log('Too many requests. Retrying...');
+                attempts++;
+                await sleep(5000); // Wait for 5 seconds before retrying
+            }
+
+
         }
+    } catch (errrr) {
+        console.log(errrr);
+        return {success : false}
     }
 
-    await bot.sendMessage(chatId , 'Limit Exceeded. Bye')
-    throw new Error('Exceeded retry limit for generating image');
 }
 
 
@@ -77,10 +80,12 @@ export default async function handler(req, res) {
                     return res.status(200).send();
                 }
 
-                const imageBlob = await generateImage(imageDescription, bot, chatId)
+                const result = await generateImage(imageDescription, bot, chatId)
 
-
-                const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+                if (!result.success) {
+                    await bot.sendMessage(chatId, 'There was an issue generating the image. Please try again later.')
+                }
+                const imageBuffer = Buffer.from(await result.imageBlob.arrayBuffer());
                 await bot.sendPhoto(chatId, imageBuffer, { caption: `Here is your image for: "${imageDescription}"`, filename: 'generated-image.png' });
 
             }
