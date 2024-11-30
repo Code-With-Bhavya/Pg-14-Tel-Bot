@@ -30,7 +30,7 @@ async function generateImage(description) {
 }
 
 // Handle incoming messages
-export default async function(){
+export default async function(msg){
     const chatId = msg.chat.id;
     const userMessage = msg.text?.trim();
 
