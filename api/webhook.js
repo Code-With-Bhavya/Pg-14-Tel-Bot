@@ -5,7 +5,7 @@ import fs from 'fs';
 
 // Telegram and Gemini setup
 const token = process.env.TELEGRAM_TOKEN; // Add your bot token in .env
-const bot = new TelegramBot(token, { polling: false });
+const bot = new TelegramBot(token, { polling: true });
 
 const key = process.env.GEMINI_API_KEY; // Add your Gemini API key in .env
 const genAI = new GoogleGenerativeAI(key);
@@ -29,41 +29,19 @@ async function generateImage(description) {
     return await response.blob();
 }
 
-// Telegram webhook handler
-export default async function handler(req, res) {
-    if (req.method === 'POST') {
-        const update = req.body;
+// Handle incoming messages
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const userMessage = msg.text?.trim();
 
-        if (!update.message) {
-            return res.status(200).send(); // Acknowledge non-message updates
-        }
-
-        const chatId = update.message.chat.id;
-        const userMessage = update.message.text.trim();
-
-        try {
-            if (userMessage === '/start') {
-                // Display menu options
-                await bot.sendMessage(chatId, "Welcome to the AI Bot! Choose an option below:", {
-                    reply_markup: {
-                        keyboard: [["Generate Text"], ["Generate Image"], ["Help"]],
-                        resize_keyboard: true,
-                        one_time_keyboard: true,
-                    },
-                });
-            } else if (userMessage === "Generate Text") {
-                await bot.sendMessage(chatId, "Send your text query, and I'll generate a response for you!");
-                bot.once("message", async (textMsg) => {
-                    const userInput = textMsg.text;
-                    const result = await model.generateContent(userInput);
-                    const reply = result.response.text().trim();
-                    await bot.sendMessage(chatId, reply);
-                });
-            } else if (userMessage === "Generate Image") {
-                await bot.sendMessage(chatId, "Send the description of the image you want to generate.");
-                bot.once("message", async (imageMsg) => {
-                    const description = imageMsg.text;
-                    await bot.sendMessage(chatId, "Generating your image, please wait...");
+    try {
+        if (userMessage === '/image') {
+            // Set a temporary state to indicate the bot expects an image description next
+            await bot.sendMessage(chatId, 'Please send the description of the image you want to generate.');
+            bot.once('message', async (imageMsg) => {
+                const description = imageMsg.text;
+                try {
+                    await bot.sendMessage(chatId, 'Generating your image, please wait...');
                     const imageBlob = await generateImage(description);
 
                     // Save and send the image
@@ -73,24 +51,20 @@ export default async function handler(req, res) {
 
                     await bot.sendPhoto(chatId, filePath, { caption: `Here is your image for: "${description}"` });
                     fs.unlinkSync(filePath); // Clean up
-                });
-            } else if (userMessage === "Help") {
-                await bot.sendMessage(
-                    chatId,
-                    "Use the menu to:\n- Select 'Generate Text' for text responses.\n- Select 'Generate Image' to create images.\n- Or type /start to view the menu again."
-                );
-            } else {
-                // Default fallback
-                await bot.sendMessage(chatId, "I didn't understand that. Use /start to see the menu.");
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            const errorMessage = error.response?.data?.error?.message || 'Sorry, something went wrong!';
-            await bot.sendMessage(chatId, errorMessage);
+                } catch (imageError) {
+                    console.error('Error generating image:', imageError);
+                    await bot.sendMessage(chatId, 'Failed to generate the image. Please try again.');
+                }
+            });
+        } else {
+            // Default behavior: Text generation
+            const result = await model.generateContent(userMessage);
+            const reply = result.response.text().trim();
+            await bot.sendMessage(chatId, reply);
         }
-
-        res.status(200).send(); // Acknowledge Telegram's request
-    } else {
-        res.status(405).send('Method Not Allowed'); // Handle non-POST requests
+    } catch (error) {
+        console.error('Error handling message:', error);
+        const errorMessage = error.response?.data?.error?.message || 'Sorry, something went wrong!';
+        await bot.sendMessage(chatId, errorMessage);
     }
-}
+});
