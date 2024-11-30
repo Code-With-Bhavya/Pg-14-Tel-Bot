@@ -12,21 +12,45 @@ const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // Hugging Face API setup
 const hfToken = process.env.HF_API_KEY; // Add your Hugging Face API key in .env
-async function generateImage(description) {
-    const response = await fetch("https://api-inference.huggingface.co/models/ZB-Tech/Text-to-Image", {
-        headers: {
-            Authorization: `Bearer ${hfToken}`,
-            "Content-Type": "application/json",
-        },
-        method: "POST",
-        body: JSON.stringify({ inputs: description }),
-    });
 
-    if (!response.ok) {
-        throw new Error(`Failed to generate image: ${response.statusText}`);
-    }
-    return await response.blob();
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+
+
+async function generateImage(description, chatId, bot) {
+    const maxRetries = 3; // Limit the number of retries
+    let attempts = 0;
+    while (attempts < maxRetries) {
+        const response = await fetch("https://api-inference.huggingface.co/models/ZB-Tech/Text-to-Image", {
+            headers: {
+                Authorization: `Bearer ${hfToken}`,
+                "Content-Type": "application/json",
+            },
+            method: "POST",
+            body: JSON.stringify({ inputs: description }),
+        });
+
+        if (response.ok) {
+            return await response.blob();  // If successful, return the image blob
+        }
+
+        // Check if the error is related to too many requests (status code 429)
+        if (response.status === 429) {
+            console.log('Too many requests. Retrying...');
+            await bot.sendMessage(chatId, 'Too Many Request. Try again')
+            attempts++;
+            await sleep(5000); // Wait for 5 seconds before retrying
+        } else {
+            throw new Error(`Failed to generate image: ${response.statusText}`);
+        }
+    }
+
+    await bot.sendMessage(chatId , 'Limit Exceeded. Bye')
+    throw new Error('Exceeded retry limit for generating image');
+}
+
 
 // Handle incoming messages
 export default async function handler(req, res) {
@@ -53,7 +77,7 @@ export default async function handler(req, res) {
                     return res.status(200).send();
                 }
 
-                const imageBlob = await generateImage(imageDescription)
+                const imageBlob = await generateImage(imageDescription, bot, chatId)
 
 
                 const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
