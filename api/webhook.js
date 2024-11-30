@@ -1,7 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import fetch from 'node-fetch';
-import fs from 'fs/promises';
 
 // Telegram and Gemini setup
 const token = process.env.TELEGRAM_TOKEN; // Add your bot token in .env
@@ -56,13 +55,10 @@ export default async function handler(req, res) {
 
                 const imageBlob = await generateImage(imageDescription)
 
-                const filePath = `generated-image-${Date.now()}.png`;
 
+                const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+                await bot.sendPhoto(chatId, imageBuffer, { caption: `Here is your image for: "${imageDescription}"` });
 
-                const buffer = Buffer.from(await imageBlob.arrayBuffer());
-                await fs.writeFileSync(filePath, buffer);
-                await bot.sendPhoto(chatId, filePath, { caption: `Here is your image for: "${imageDescription}"` });
-                await fs.unlinkSync(filePath);
             }
             else {
                 //default text 
